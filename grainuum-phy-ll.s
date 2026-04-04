@@ -31,8 +31,21 @@
 
 #ifndef GRAINUUM_SECTION
 #define GRAINUUM_SECTION .ramtext
-#endif 
-.section GRAINUUM_SECTION /* Can also run out of .section .text */
+#endif
+.section GRAINUUM_SECTION, "ax", %progbits
+
+/*
+ * PY32F030 / STM32-style GPIO support (enabled with -DPY32_GPIO):
+ *
+ * Kinetis GPIO uses 1-bit-per-pin direction registers. STM32/PY32 MODER
+ * uses 2 bits per pin (00=input, 01=output). The data path registers
+ * (set/clear/read) map 1:1 — only MODER direction changes need patching.
+ * Guarded by #ifdef PY32_GPIO; upstream Kinetis behavior unchanged without it.
+ */
+#ifdef PY32_GPIO
+.equ PY32_MODER_CLR, 0x0F     /* Clear mask for pin0[1:0] + pin1[3:2] */
+.equ PY32_MODER_OUT, 0x05     /* Output mode 01,01 for both pins */
+#endif
 
 .cpu    cortex-m0plus
 .fpu    softvfp
@@ -551,7 +564,18 @@ wstuff    .req r0   /* The last six bits, used for bit stuffing (reuses wusbphy)
   str wpmask, [wpaddr]              // Write D+ value
   str wnmask, [wnaddr]              // Write D- value
 
-  /* Set D+ line to OUTPUT */
+#ifdef PY32_GPIO
+  /* PY32/STM32: Set both pins to output via MODER (2 bits/pin) */
+  /* r1 is free here (wlastsym not yet initialized) */
+  ldr wtmp1, [wusbphy, #dpDAddr]    // MODER address (shared for both pins)
+  ldr wtmp2, [wtmp1]                // Read current MODER value
+  movs r1, #PY32_MODER_CLR          // 0x0F: clear mask for both pins' mode bits
+  bic wtmp2, r1                     // Clear mode bits
+  movs r1, #PY32_MODER_OUT          // 0x05: output mode (01,01)
+  orr wtmp2, r1                     // Set output for both pins
+  str wtmp2, [wtmp1]                // Write MODER
+#else
+  /* Kinetis: Set D+ line to OUTPUT (1 bit/pin direction register) */
   ldr wtmp1, [wusbphy, #dpDAddr]    // Get the direction address
   ldr wtmp2, [wtmp1]                // Get the direction value
   orr wtmp2, wtmp2, wpmask          // Set the direciton mask
@@ -562,6 +586,7 @@ wstuff    .req r0   /* The last six bits, used for bit stuffing (reuses wusbphy)
   ldr wtmp2, [wtmp1]                // Get the direction value
   orr wtmp2, wtmp2, wnmask          // Set the direciton mask
   str wtmp2, [wtmp1]                // Set the direction for D-
+#endif
 
   /* Set K state.  This indicates the start of the packet. */
   mov wpaddr, wdpclrreg             // D+ clr
@@ -779,7 +804,15 @@ usb_phy_write__send_se0:
 
   /* Now, set both lines back to INPUT */
 
-  /* Set D+ line to INPUT */
+#ifdef PY32_GPIO
+  /* PY32/STM32: Set both pins to input via MODER (clear 2-bit fields) */
+  ldr wtmp1, [wusbphy, #dpDAddr]    // MODER address
+  ldr wtmp2, [wtmp1]                // Read MODER
+  movs wleft, #PY32_MODER_CLR       // 0x0F (r3 is free here)
+  bic wtmp2, wleft                  // Clear mode bits = input (00,00)
+  str wtmp2, [wtmp1]                // Write MODER
+#else
+  /* Kinetis: Set D+ line to INPUT */
   ldr wtmp1, [wusbphy, #dpDAddr]    // Get the direction address
   ldr wtmp2, [wtmp1]                // Get the direction value
   bic wtmp2, wtmp2, wpmask          // Clear the direciton mask
@@ -790,6 +823,7 @@ usb_phy_write__send_se0:
   ldr wtmp2, [wtmp1]                // Get the direction value
   bic wtmp2, wtmp2, wnmask          // Clear the direciton mask
   str wtmp2, [wtmp1]                // Set the direction for D-
+#endif
 
   pop {r3-r6}                       // Restore registers
   mov r11, r6
