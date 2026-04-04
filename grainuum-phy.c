@@ -73,22 +73,21 @@ void grainuumInitPost(struct GrainuumUSB *usb)
 
 /* --- */
 
-/* Section must match GRAINUUM_SECTION used by the assembly PHY.
- * The _GRAINUUM_STR / _GRAINUUM_XSTR macros stringify the define
- * so it can be used in __attribute__((section("..."))) */
-#define _GRAINUUM_XSTR(s) _GRAINUUM_STR(s)
-#define _GRAINUUM_STR(s) #s
-#ifndef GRAINUUM_SECTION
-#define GRAINUUM_SECTION .ramtext
-#endif
-#define GRAINUUM_SECTION_ATTR __attribute__((section(_GRAINUUM_XSTR(GRAINUUM_SECTION))))
+/*
+ * These C functions call into the assembly PHY (which runs from RAM)
+ * and into the state machine (which runs from flash). Placing them in
+ * a RAM section causes relocation issues on platforms where RAM and flash
+ * are far apart (e.g. Cortex-M: 0x2000xxxx vs 0x0800xxxx).
+ *
+ * Only the assembly PHY (grainuum-phy-ll.S) needs to be in RAM for
+ * cycle-accurate timing. These C wrappers can stay in flash — the linker
+ * generates veneers for the flash→RAM calls to the PHY automatically.
+ */
 
-GRAINUUM_SECTION_ATTR
 void grainuum_receive_packet(struct GrainuumUSB *usb) {
   grainuumReceivePacket(usb);
 }
 
-GRAINUUM_SECTION_ATTR
 void grainuumCaptureI(struct GrainuumUSB *usb, uint8_t *samples)
 {
   int ret;
