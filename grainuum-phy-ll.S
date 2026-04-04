@@ -566,13 +566,13 @@ wstuff    .req r0   /* The last six bits, used for bit stuffing (reuses wusbphy)
 
 #ifdef PY32_GPIO
   /* PY32/STM32: Set both pins to output via MODER (2 bits/pin) */
-  /* r1 is free here (wlastsym not yet initialized) */
+  /* r3 (wleft) is free here - r1 holds buffer pointer, must NOT be clobbered */
   ldr wtmp1, [wusbphy, #dpDAddr]    // MODER address (shared for both pins)
   ldr wtmp2, [wtmp1]                // Read current MODER value
-  movs r1, #PY32_MODER_CLR          // 0x0F: clear mask for both pins' mode bits
-  bic wtmp2, r1                     // Clear mode bits
-  movs r1, #PY32_MODER_OUT          // 0x05: output mode (01,01)
-  orr wtmp2, r1                     // Set output for both pins
+  movs wleft, #PY32_MODER_CLR       // 0x0F: clear mask for both pins' mode bits
+  bic wtmp2, wleft                  // Clear mode bits
+  movs wleft, #PY32_MODER_OUT       // 0x05: output mode (01,01)
+  orr wtmp2, wleft                  // Set output for both pins
   str wtmp2, [wtmp1]                // Write MODER
 #else
   /* Kinetis: Set D+ line to OUTPUT (1 bit/pin direction register) */
