@@ -73,12 +73,22 @@ void grainuumInitPost(struct GrainuumUSB *usb)
 
 /* --- */
 
-__attribute__((section(".ramtext")))
+/* Section must match GRAINUUM_SECTION used by the assembly PHY.
+ * The _GRAINUUM_STR / _GRAINUUM_XSTR macros stringify the define
+ * so it can be used in __attribute__((section("..."))) */
+#define _GRAINUUM_XSTR(s) _GRAINUUM_STR(s)
+#define _GRAINUUM_STR(s) #s
+#ifndef GRAINUUM_SECTION
+#define GRAINUUM_SECTION .ramtext
+#endif
+#define GRAINUUM_SECTION_ATTR __attribute__((section(_GRAINUUM_XSTR(GRAINUUM_SECTION))))
+
+GRAINUUM_SECTION_ATTR
 void grainuum_receive_packet(struct GrainuumUSB *usb) {
   grainuumReceivePacket(usb);
 }
 
-__attribute__((section(".ramtext")))
+GRAINUUM_SECTION_ATTR
 void grainuumCaptureI(struct GrainuumUSB *usb, uint8_t *samples)
 {
   int ret;
