@@ -45,6 +45,7 @@
 #ifdef PY32_GPIO
 .equ PY32_MODER_CLR, 0x0F     /* Clear mask for pin0[1:0] + pin1[3:2] */
 .equ PY32_MODER_OUT, 0x05     /* Output mode 01,01 for both pins */
+.equ PY32_DM_MASK, 0x02       /* D- pin mask (PA1 = bit 1) for SE0 check */
 #endif
 
 .cpu    cortex-m0plus
@@ -365,6 +366,10 @@ usb_phy_read__check_unstuff:
   cmp rreg, rval
 
   /* Loop again */
+#ifdef PY32_GPIO
+  nop                                 // PY32: compensate for timing difference vs
+  nop                                 // Kinetis M0+ (2 NOPs = 2 extra cycles).
+#endif
   bne usb_phy_read__get_usb_bit
   // 2 (if branch taken, 1 if unstuffing needs to happen)
 
