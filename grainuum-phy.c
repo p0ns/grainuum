@@ -118,6 +118,11 @@ void grainuumCaptureI(struct GrainuumUSB *usb, uint8_t *samples)
     break;
 
   case USB_PID_SETUP:
+    /* Clear any stale EP0 data from a previous (failed) transfer.
+     * Without this, a retried GET_DESCRIPTOR can send leftover data
+     * from the prior attempt before the drain loop processes the new SETUP. */
+    if (usb->queued_epnum == 0)
+      usb->queued_size = 0;
     grainuum_receive_packet(usb);
     break;
 

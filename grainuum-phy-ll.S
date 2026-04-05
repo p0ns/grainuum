@@ -248,7 +248,10 @@ usb_phy_read__sync_wait:
 
   // Wait for the end-of-header sync pulse, which is when the value
   // repeats itself.  This is the "KK" in the KJKJKJKK training sequence.
-.rept 6
+  // Need 8 iterations (not 6) to handle fast K-state detection where
+  // phase 1 finds the transition early in SYNC, leaving more alternating
+  // bits before the KK terminator.
+.rept 8
   ldr rval, [rreg]                    // Sample USBDP
   and rval, rmash                     // Mask off the interesting bit
   cmp rlastval, rval
@@ -367,8 +370,12 @@ usb_phy_read__check_unstuff:
 
   /* Loop again */
 #ifdef PY32_GPIO
-  nop                                 // PY32: compensate for timing difference vs
-  nop                                 // Kinetis M0+ (2 NOPs = 2 extra cycles).
+#ifndef PY32_READ_NOPS
+#define PY32_READ_NOPS 2
+#endif
+.rept PY32_READ_NOPS
+  nop
+.endr
 #endif
   bne usb_phy_read__get_usb_bit
   // 2 (if branch taken, 1 if unstuffing needs to happen)
