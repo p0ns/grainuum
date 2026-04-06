@@ -289,9 +289,9 @@ static void grainuum_state_parse_data(struct GrainuumState *state,
     break;
 
   case packet_type_out:
-    // XXX HACK: An OUT packet gets generated (on Windows at least) when
-    // terminating a SETUP sequence.  This seems odd.
-    if (state->tok_epnum == 0)
+    // Skip zero-length OUT status packets on EP0 (e.g. Windows control-read
+    // termination), but allow data OUT on EP0 for SET_REPORT transfers.
+    if (state->tok_epnum == 0 && (size <= 2))
       break;
     // Copy over the packet, minus the CRC16
     memcpy(state->tok_buf + state->tok_pos, packet, size - 2);
