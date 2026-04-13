@@ -193,11 +193,18 @@ void grainuumDisconnect(struct GrainuumUSB *usb) {
 
   /* Set both lines to output */
 #ifdef PY32_GPIO
-  /* PY32/STM32: MODER uses 2 bits per pin (00=input, 01=output) */
+  /* PY32/STM32: MODER uses 2 bits per pin (00=input, 01=output).
+   * Pin numbers come from -DUSB_DP_PIN / -DUSB_DM_PIN build flags. */
+#ifndef USB_DP_PIN
+#define USB_DP_PIN 0
+#endif
+#ifndef USB_DM_PIN
+#define USB_DM_PIN 1
+#endif
   {
     uint32_t moder = grainuumReadl(usb->usbdnDAddr);
-    moder &= ~0x0FUL;  /* Clear both pins' mode bits */
-    moder |= 0x05UL;   /* Set output mode 01,01 */
+    moder &= ~((uint32_t)((3U << (USB_DP_PIN * 2)) | (3U << (USB_DM_PIN * 2))));
+    moder |= (uint32_t)((1U << (USB_DP_PIN * 2)) | (1U << (USB_DM_PIN * 2)));
     grainuumWritel(moder, usb->usbdnDAddr);
   }
 #else
@@ -216,7 +223,7 @@ void grainuumConnect(struct GrainuumUSB *usb) {
 #ifdef PY32_GPIO
   {
     uint32_t moder = grainuumReadl(usb->usbdnDAddr);
-    moder &= ~0x0FUL;
+    moder &= ~((uint32_t)((3U << (USB_DP_PIN * 2)) | (3U << (USB_DM_PIN * 2))));
     grainuumWritel(moder, usb->usbdnDAddr);
   }
 #else

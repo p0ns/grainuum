@@ -43,9 +43,18 @@
  * Guarded by #ifdef PY32_GPIO; upstream Kinetis behavior unchanged without it.
  */
 #ifdef PY32_GPIO
-.equ PY32_MODER_CLR, 0x0F     /* Clear mask for pin0[1:0] + pin1[3:2] */
-.equ PY32_MODER_OUT, 0x05     /* Output mode 01,01 for both pins */
-.equ PY32_DM_MASK, 0x02       /* D- pin mask (PA1 = bit 1) for SE0 check */
+/* Pin numbers default to PA0/PA1 if not provided via -D build flags.
+ * Override with e.g. -DUSB_DP_PIN=2 -DUSB_DM_PIN=7 in platformio.ini. */
+#ifndef USB_DP_PIN
+#define USB_DP_PIN 0
+#endif
+#ifndef USB_DM_PIN
+#define USB_DM_PIN 1
+#endif
+/* MODER masks computed from pin numbers (2 bits per pin) */
+.equ PY32_MODER_CLR, (3 << (USB_DP_PIN * 2)) | (3 << (USB_DM_PIN * 2))
+.equ PY32_MODER_OUT, (1 << (USB_DP_PIN * 2)) | (1 << (USB_DM_PIN * 2))
+.equ PY32_DM_MASK, (1 << USB_DM_PIN)
 #endif
 
 .cpu    cortex-m0plus
@@ -581,9 +590,9 @@ wstuff    .req r0   /* The last six bits, used for bit stuffing (reuses wusbphy)
   /* r3 (wleft) is free here - r1 holds buffer pointer, must NOT be clobbered */
   ldr wtmp1, [wusbphy, #dpDAddr]    // MODER address (shared for both pins)
   ldr wtmp2, [wtmp1]                // Read current MODER value
-  movs wleft, #PY32_MODER_CLR       // 0x0F: clear mask for both pins' mode bits
+  ldr wleft, =PY32_MODER_CLR         // Clear mask for both pins' mode bits
   bic wtmp2, wleft                  // Clear mode bits
-  movs wleft, #PY32_MODER_OUT       // 0x05: output mode (01,01)
+  ldr wleft, =PY32_MODER_OUT         // Output mode (01,01) for both pins
   orr wtmp2, wleft                  // Set output for both pins
   str wtmp2, [wtmp1]                // Write MODER
 #else
@@ -820,7 +829,7 @@ usb_phy_write__send_se0:
   /* PY32/STM32: Set both pins to input via MODER (clear 2-bit fields) */
   ldr wtmp1, [wusbphy, #dpDAddr]    // MODER address
   ldr wtmp2, [wtmp1]                // Read MODER
-  movs wleft, #PY32_MODER_CLR       // 0x0F (r3 is free here)
+  ldr wleft, =PY32_MODER_CLR         // Clear mask (r3 is free here)
   bic wtmp2, wleft                  // Clear mode bits = input (00,00)
   str wtmp2, [wtmp1]                // Write MODER
 #else
